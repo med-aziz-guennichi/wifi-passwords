@@ -3,6 +3,7 @@ use std::{ffi::OsString, os::windows::ffi::OsStringExt};
 
 use windows::{
   core::{GUID,HSTRING,PCWSTR,PWSTR},
+  Data::Xml::Dom::{XmlDocument, XmlElement},
   Win32::{
     Foundation::{ERROR_SUCCESS,HANDLE,INVALID_HANDLE_VALUE,WIN32_ERROR},
     NetworkManagement::WiFi::{
@@ -47,6 +48,36 @@ fn grab_interface_profiles(handle:HANDLE,interface_guid:&GUID) -> Result<*const 
 fn parse_utf16_slice(string_slice:&[u16]) -> Option<OsString> {
   let null_index = string_slice.iter().position(|c| c == &0)?;
   Some(OsString::from_wide(&string_slice[..null_index]))
+}
+
+fn load_xml_data(xml:&OsString) -> Result<XmlDocument, windows::core::Error> {
+  let xml_document = XmlDocument::new()?;
+  xml_document.LoadXml(&HSTRING::from(xml))?;
+  Ok(xml_document)
+}
+
+fn traverse_xml_tree(xml: &XmlDocument, node_path:&[&str]) -> Option<String> {
+  let mut subtree_list = xml.ChildNodes().ok()?;
+  let last_node_name = node_path.last()?;
+
+  'node_traversse: for node in node_path {
+    let node_name = OsString::from_wide(&node.encode_utf16().collect()::<Vec<u16>>());
+
+    for subtree_value in &subtree_list {
+      let element_name = match subtree_value.NodeName() {
+        Ok(name) => name,
+        Err(_) => continue
+      };
+      if element_name.to_os_string() == node_name {
+        if element_name.to_os_string().to_string_lossy().to_string() == last_node_name.to_string() {
+          return Some(subtree_value.InnerText().ok()?.to_string());
+        }
+        subtree_list = subtree_value.ChildNodes().ok()?;
+        continue 'node_traversse;
+      }
+    }
+  }
+  None
 }
 
 fn main() {
