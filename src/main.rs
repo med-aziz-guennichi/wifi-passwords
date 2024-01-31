@@ -5,7 +5,7 @@ use windows::{
   core::{GUID,HSTRING,PCWSTR,PWSTR},
   Data::Xml::Dom::{XmlDocument, XmlElement},
   Win32::{
-    Foundation::{ERROR_SUCCESS,HANDLE,INVALID_HANDLE_VALUE,WIN32_ERROR},
+    Foundation::{HANDLE,INVALID_HANDLE_VALUE,WIN32_ERROR},
     NetworkManagement::WiFi::{
       WlanCloseHandle, WlanEnumInterfaces, WlanFreeMemory, WlanGetProfile, WlanGetProfileList,
       WlanOpenHandle,WLAN_API_VERSION_2_0, WLAN_INTERFACE_INFO_LIST,
@@ -114,7 +114,7 @@ fn main() {
         std::slice::from_raw_parts((*interface_ptr).InterfaceInfo.as_ptr(),(*interface_ptr).dwNumberOfItems as usize)
     };
     for interface_info in interfaces_list {
-      let interface_description = match parse_utf16_slice(interface_info.strInterfaceDescription.as_slice()){
+      let _interface_description = match parse_utf16_slice(interface_info.strInterfaceDescription.as_slice()){
         Some(name) => name,
         None => {
           eprintln!("Could not parse our interface description");
