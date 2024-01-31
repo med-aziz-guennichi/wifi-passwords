@@ -80,6 +80,24 @@ fn traverse_xml_tree(xml: &XmlDocument, node_path:&[&str]) -> Option<String> {
   None
 }
 
+fn get_profile_xml(handle:HANDLE,interface_guid:&GUID,profile_name:&OsString) -> Result<OsString,windows::core::Error> {
+  let mut profile_xml_data = PWSTR::null();
+  let mut profile_get_flags = WLAN_PROFILE_GET_PLAINTEXT_KEY;
+
+  let result = unsafe {WlanGetProfile(handle, interface_guid, PCWSTR(HSTRING::from(profile_name).as_ptr()), None, &mut profile_xml_data, Some(&mut profile_get_flags), None)};
+
+  WIN32_ERROR(result).ok()?;
+
+  let xml_string = match unsafe {profile_xml_data.to_hstring()} {
+    Ok(data) => data,
+    Err(e) => {
+      unsafe {WlanFreeMemory(profile_xml_data.as_ptr().cast())};
+      return Err(e);
+    }
+  };
+  Ok(xml_string.to_os_string())
+}
+
 fn main() {
     let wlan_handle = open_wlan_handle(WLAN_API_VERSION_2_0).expect("Failed to open WLAN handle!");
 
