@@ -1,4 +1,7 @@
 
+use core::slice::SlicePattern;
+use std::{ffi::OsString, os::windows::ffi::OsStringExt};
+
 use windows::{
   core::{GUID,HSTRING,PCWSTR,PWSTR},
   Win32::{
@@ -42,6 +45,11 @@ fn grab_interface_profiles(handle:HANDLE,interface_guid:&GUID) -> Result<*const 
   Ok(wlan_profiles_ptr)
 }
 
+fn parse_utf16_slice(string_slice:&[u16]) -> Option<OsString> {
+  let null_index = string_slice.iter().position(|c| c == &0)?;
+  Some(OsString::from_wide(&string_slice[..null_index]))
+}
+
 fn main() {
     let wlan_handle = open_wlan_handle(WLAN_API_VERSION_2_0).expect("Failed to open WLAN handle!");
 
@@ -53,4 +61,18 @@ fn main() {
         std::process::exit(1);
       }
     };
+
+    let interfaces_list = unsafe {
+        std::slice::from_raw_parts((*interface_ptr).InterfaceInfo.as_ptr(),(*interface_ptr).dwNumberOfItems as usize)
+    };
+    for interface_info in interfaces_list {
+      let interface_description = match parse_utf16_slice(interface_info.strInterfaceDescription.as_slice()){
+        Some(name) => name,
+        None => {
+          eprintln!("Could not parse our interface description");
+          continue;
+        }
+      };
+      
+    }
 }
