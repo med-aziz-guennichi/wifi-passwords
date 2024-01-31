@@ -56,12 +56,12 @@ fn load_xml_data(xml:&OsString) -> Result<XmlDocument, windows::core::Error> {
   Ok(xml_document)
 }
 
-fn traverse_xml_tree(xml: &XmlDocument, node_path:&[&str]) -> Option<String> {
+fn traverse_xml_tree(xml: &XmlElement, node_path:&[&str]) -> Option<String> {
   let mut subtree_list = xml.ChildNodes().ok()?;
   let last_node_name = node_path.last()?;
 
   'node_traversse: for node in node_path {
-    let node_name = OsString::from_wide(&node.encode_utf16().collect()::<Vec<u16>>());
+    let node_name = OsString::from_wide(&node.encode_utf16().collect::<Vec<u16>>());
 
     for subtree_value in &subtree_list {
       let element_name = match subtree_value.NodeName() {
@@ -138,6 +138,54 @@ fn main() {
             continue;
           }
         };
+
+        let profile_xml_data = match get_profile_xml(wlan_handle, &interface_info.InterfaceGuid, &profile_name) {
+          Ok(data) => data,
+          Err(_e) => {
+            eprintln!("Failed to retrieve profile XML");
+            continue;
+          }
+        };
+
+        let xml_document = match load_xml_data(&profile_xml_data) {
+          Ok(xml) => xml,
+          Err(_e) => {
+            eprintln!("Failed to extract XML document");
+            continue;
+          }
+        };
+
+        let root = match xml_document.DocumentElement() {
+          Ok(root) => root,
+          Err(_e) => {
+            eprintln!("Failed to get document root for profile XML");
+            continue;
+          }
+        };
+
+        let auth_type = match traverse_xml_tree(&root, &["MSM","security","authEncryption","authentication"]) {
+          Some(t) => t,
+          None => {
+            eprintln!("Failed to get the auth type for this profile");
+            continue;
+          }
+        };
+        match auth_type.as_str() {
+          "open" => {
+            println!("Wi_Fi Name: {}, No password", profile_name.to_string_lossy().to_string());
+          },
+          "WPA2" | "WPA2PSK" => {
+            if let Some(password) = traverse_xml_tree(&root, &["MSM","security","sharedKey","keyMaterial"]) {
+              println!("Wi-Fi Name: {}, Authentication: {} Password: {}", profile_name.to_string_lossy().to_string(),auth_type, password);
+            }
+          },
+          _ => {
+            println!("Wi-Fi Name: {}, Authentication: {}", profile_name.to_string_lossy().to_string(),auth_type);
+          }
+        }
       }
     }
+
+    unsafe {WlanFreeMemory(interface_ptr.cast())};
+    unsafe {WlanCloseHandle(wlan_handle, None)};
 }
