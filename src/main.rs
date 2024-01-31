@@ -1,5 +1,4 @@
 
-use core::slice::SlicePattern;
 use std::{ffi::OsString, os::windows::ffi::OsStringExt};
 
 use windows::{
@@ -73,6 +72,23 @@ fn main() {
           continue;
         }
       };
-      
+      let wlan_profile_ptr = match grab_interface_profiles(wlan_handle, &interface_info.InterfaceGuid) {
+        Ok(profiles) => profiles,
+        Err(_e) => {
+          eprintln!("Failed to retrieve profiles");
+          continue;
+        }
+      };
+      let wlan_profile_list = unsafe {std::slice::from_raw_parts((*wlan_profile_ptr).ProfileInfo.as_ptr(), (*wlan_profile_ptr).dwNumberOfItems as usize)};
+
+      for profile in wlan_profile_list {
+        let profile_name = match parse_utf16_slice(&profile.strProfileName) {
+          Some(name) => name,
+          None => {
+            eprintln!("Could not parse profile name");
+            continue;
+          }
+        };
+      }
     }
 }
